@@ -12810,44 +12810,34 @@ function App() {
       .trim()
       .substring(0, 400);
 
-    let apiKey = localStorage.getItem("anthropic_api_key") || "";
-    if (!apiKey) {
-      apiKey = window.prompt("Enter your Anthropic API key (stored only in this browser):") || "";
-      if (apiKey) localStorage.setItem("anthropic_api_key", apiKey.trim());
+    let password = localStorage.getItem("qv_password") || "";
+    if (!password) {
+      password = window.prompt("Enter the AI breakdown password to unlock quote insights:") || "";
+      if (password) localStorage.setItem("qv_password", password.trim());
     }
-    if (!apiKey) {
-      setExplanation("No API key set. Click a quote again to enter one.");
+    if (!password) {
+      setExplanation("Locked. The quote vault is free to browse — clicking a quote also generates an AI breakdown (Reel script + Pray.com caption) but that requires a password. Click a quote again to enter one.");
       setLoadingExplanation(false);
       return;
     }
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/explain", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey.trim(),
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: `${personaLine}\n\nGiven this quote:\n\n"${cleanQuote}"\n\nRespond in EXACTLY this format with these 5 sections. Be direct, specific, and actionable. No fluff.\n\n**What It Means:** [2-3 sentences max. Core meaning distilled for a leader/builder.]\n\n**How to Apply It:** [2-3 sentences max. One specific action to implement this week.]\n\n**Why It Matters:** [2-3 sentences max. Connect to legacy, leadership, or what they are building.]\n\n**60-Second Script:**\n[Write a READY-TO-READ-ALOUD script for an Instagram Reel (under 155 words). Follow this EXACT structure:\n\nLINE 1 — THE HOOK (first 1.5 seconds, must stop the scroll): Use ONE of these proven patterns — pick whichever fits the quote best:\n• Identity callout: "If you're the person everyone leans on but nobody checks on…"\n• Controversial take: "Everyone talks about [X] but nobody tells you [Y]."\n• Pattern interrupt: "Stop scrolling. This quote just described your entire year."\n• Open loop: "There's a quote that changed how I lead. And you've probably never heard it."\nThe hook MUST feel personal and specific — never generic.\n\nLINES 2-3 — DELIVER THE QUOTE: State the quote with dramatic pacing. Break it into 2 beats if it is long.\n\nLINES 4-7 — THE BREAKDOWN (this is the value): Explain WHY this hits so hard using the Barnum/Forer effect. Phrase insights as deeply personal revelations that actually apply universally ("You already knew this… you just needed permission to act on it." / "You've been carrying this weight because you thought resting meant quitting."). Use short, punchy sentences. One idea per line. Speak in second person ("you"). Build emotional momentum — each line should hit harder than the last.\n\nLINE 8 — THE REFRAME: One sharp sentence that flips the listener's perspective or raises the stakes. This is the "aha" moment.\n\nLINE 9 — THE CTA (must drive saves + shares): Use ONE of these — pick whichever fits:\n• "Save this for the day you almost quit."\n• "Send this to someone building something that matters."\n• "If this hit you, follow @pray for more."\n• "Screenshot this. Your future self needs it."\n\nFORMATTING RULES:\n- Write for SPEAKING CADENCE: short sentences, natural pauses, conversational.\n- Each sentence on its own line.\n- No emojis, no hashtags, no stage directions like [pause].\n- No quotation marks around the quote when spoken — just say it.\n- Total script must be under 155 words.]\n\n**Caption:** [Write a 2-3 sentence Instagram caption that complements the Reel. Include a question or micro-CTA that drives comments. End with 3-5 relevant hashtags from this set: #PrayApp #FaithOverFear #LeadershipQuotes #DailyWisdom #ChristianLeader #BuildSomethingGreat #MondayMotivation #QuoteOfTheDay #SpiritualGrowth #EntrepreneurMindset]`
-          }],
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quote: cleanQuote, password: password.trim() }),
       });
       const data = await response.json();
-      const text = data.content?.map(i => i.text || "").join("\n") || "";
-      if (data.error) {
-        setExplanation("API error: " + (data.error.message || JSON.stringify(data.error)));
+      if (response.status === 401) {
+        localStorage.removeItem("qv_password");
+        setExplanation("Wrong password. Click a quote again to try a different one.");
+      } else if (!response.ok || data.error) {
+        setExplanation("Error: " + (data.error || ("HTTP " + response.status)));
       } else {
-        setExplanation(text || "No text in response.");
+        setExplanation(data.text || "No text in response.");
       }
     } catch (err) {
-      setExplanation("Network error: " + (err && err.message ? err.message : String(err)) + "\n\nIf this persists, your API key may be wrong. Clear it by running `localStorage.removeItem('anthropic_api_key')` in the browser console, then click a quote again.");
+      setExplanation("Network error: " + (err && err.message ? err.message : String(err)));
     }
     setLoadingExplanation(false);
   }, []);
